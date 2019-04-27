@@ -43,14 +43,37 @@ def main(argv):
         printGrpcError(e)
         return
 
-    table_entry = p4info_helper.buildTableEntry(
-        table_name="ingress.blocklist",
-        match_fields={
-            "hdr.ipv4.srcAddr": argv[3],
-            "hdr.ipv4.dstAddr": argv[4]
-        },
-        action_name="my_drop",
-        )
+    if argv[3] == 'TCP':
+        table_entry = p4info_helper.buildTableEntry(
+            table_name="ingress.blocklist_tcp",
+            match_fields={
+                "hdr.ipv4.srcAddr": argv[4],
+                "hdr.tcp.srcPort": int(argv[5]),
+                "hdr.ipv4.dstAddr": argv[6],
+                "hdr.tcp.dstPort": int(argv[7])
+            },
+            action_name="my_drop",
+            )
+    elif argv[3] == 'UDP':
+        table_entry = p4info_helper.buildTableEntry(
+            table_name="ingress.blocklist_udp",
+            match_fields={
+                "hdr.ipv4.srcAddr": argv[4],
+                "hdr.udp.srcPort": int(argv[5]),
+                "hdr.ipv4.dstAddr": argv[6],
+                "hdr.udp.dstPort": int(argv[7])
+            },
+            action_name="my_drop",
+            )
+    elif argv[3] == 'ICMP':
+        table_entry = p4info_helper.buildTableEntry(
+            table_name="ingress.blocklist_icmp",
+            match_fields={
+                "hdr.ipv4.srcAddr": argv[4],
+                "hdr.ipv4.dstAddr": argv[6],
+            },
+            action_name="my_drop",
+            )
     switch_connection.WriteTableEntry(table_entry)
 
 if __name__ == "__main__":

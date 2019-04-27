@@ -275,6 +275,12 @@ RXP_IPV6 = r'(?:(?:(?:[0-9A-Fa-f]{1,4}:){6}' +\
 
 # Regex covering both IPv4 and IPv6 
 RXP_IP = r"({}|{})".format(RXP_IPV4, RXP_IPV6)
+# Regex for transport layer protocol. Let's not be pedantic and consider ICMP
+# as a transport layer protocol. Also, support only TCP and UDP in the transport layer.
+RXP_TRANSPORT = r"(TCP|UDP|ICMP)"
+# Regex for transport layer port (either for TCP or UDP). nDPI prints 0 in the
+# port field for ICMP packets. We will just ignore that field.
+RXP_PORT = r"([0-9]+)"
 # Regex for protocol field of nDPI
 RXP_PROTO = r'(?:\[proto: (?:\d+\.)*?(?:{})?/(?:.*?)\])'
 # Full regex will be generated after flows are mapped to IDs
@@ -352,7 +358,7 @@ def arg_handler():
                 print("Unknown protocol name:", e, "ignoring...")
 
         # If at least one flow is found in the lookup proceed with
-        # generating the regex which capture IP addresses for specified flows
+        # generating the regex which capture flow tuples for specified flows
         if args.flows:
             # Regex for flowIDs
             flow_exp = "{}"
@@ -364,7 +370,8 @@ def arg_handler():
             RXP_PROTO = RXP_PROTO.format(flow_exp)
             
             # Full regex (in the global scope)
-            FULL_REGEX = RXP_IP + r'.*?' + RXP_IP + r'.*?' + RXP_PROTO
+            FULL_REGEX = RXP_TRANSPORT + r'.*?' + RXP_IP + ':' + RXP_PORT + r'.*?' +\
+                    RXP_IP + ':' + RXP_PORT + r'.*?' + RXP_PROTO
             FULL_REGEX = re.compile(FULL_REGEX)
 
             return args
@@ -383,15 +390,12 @@ def dpi_routine(interfaces, duration, period, captures, condition):
             condition.notify()
         sleep(period)
 
-# Parses the capture output and extracts ip addresses
+# Parses the capture output and extracts flows
 def parse_capture(capture, flows):
     global FULL_REGEX
-    # Keep only one instance of each (srcIP, dstIP) pair in the set 
     blockedIPs = set()
     groups = re.findall(FULL_REGEX, capture)
-    for group in groups: # group -> (srcIP, dstIP)
-        blockedIPs.add((group[0], group[1]))
-    return list(blockedIPs)
+    return list(groups)
 
 # Obtain IP addresses associated with the specified flows
 def switch_routine(flows, captures, condition, bmv2_json, p4info):
@@ -400,11 +404,12 @@ def switch_routine(flows, captures, condition, bmv2_json, p4info):
         with condition:
             condition.wait()
         capture = captures.pop()
-        ips = parse_capture(capture, flows)
-        print(ips)
+        flows = parse_capture(capture, flows)
 
-        for pair in ips:
-            subprocess.run(['./blocklist_add.py', bmv2_json, p4info, pair[0], pair[1]])
+        for flow in flows:
+            print(flow)
+            subprocess.run(['./blocklist_add.py', bmv2_json, p4info,
+                flow[0], flow[1], flow[2], flow[3], flow[4]])
 
 '''
 usage: dpi.py [-h] [-p] [-i I0 [I1 ...]] [-f F1 [F2 ...]] [-d TIME]
