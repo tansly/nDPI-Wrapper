@@ -37,42 +37,11 @@ def main(argv):
 
         switch_connection.MasterArbitrationUpdate()
 
+        switch_connection.SetForwardingPipelineConfig(p4info=p4info_helper.p4info,
+                                       bmv2_json_file_path=argv[1])
     except grpc.RpcError as e:
         printGrpcError(e)
         return
-
-    if argv[3] == 'TCP':
-        table_entry = p4info_helper.buildTableEntry(
-            table_name="ingress.blocklist_tcp",
-            match_fields={
-                "hdr.ipv4.srcAddr": argv[4],
-                "hdr.tcp.srcPort": int(argv[5]),
-                "hdr.ipv4.dstAddr": argv[6],
-                "hdr.tcp.dstPort": int(argv[7])
-            },
-            action_name="my_drop",
-            )
-    elif argv[3] == 'UDP':
-        table_entry = p4info_helper.buildTableEntry(
-            table_name="ingress.blocklist_udp",
-            match_fields={
-                "hdr.ipv4.srcAddr": argv[4],
-                "hdr.udp.srcPort": int(argv[5]),
-                "hdr.ipv4.dstAddr": argv[6],
-                "hdr.udp.dstPort": int(argv[7])
-            },
-            action_name="my_drop",
-            )
-    elif argv[3] == 'ICMP':
-        table_entry = p4info_helper.buildTableEntry(
-            table_name="ingress.blocklist_icmp",
-            match_fields={
-                "hdr.ipv4.srcAddr": argv[4],
-                "hdr.ipv4.dstAddr": argv[6],
-            },
-            action_name="my_drop",
-            )
-    switch_connection.WriteTableEntry(table_entry)
 
 if __name__ == "__main__":
     main(sys.argv)
